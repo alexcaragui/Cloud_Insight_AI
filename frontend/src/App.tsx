@@ -1,39 +1,34 @@
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { Admin, CustomRoutes } from 'react-admin';
+import simpleRestProvider from 'ra-data-simple-rest';
+import { Route } from 'react-router-dom';
 
-// Importăm paginile
+// Importăm paginile custom (asigură-te că le ai create în src/pages/)
 import Dashboard from './pages/Dashboard';
 import Upload from './pages/Upload';
 import Chat from './pages/Chat';
 import Reports from './pages/Reports';
-import Login from './pages/Login';
 
-// Definim rutele
-const router = createBrowserRouter([
-  {
-    path: "/",
-    element: <Dashboard />,
-  },
-  {
-    path: "/upload",
-    element: <Upload />,
-  },
-  {
-    path: "/chat",
-    element: <Chat />,
-  },
-  {
-    path: "/reports",
-    element: <Reports />,
-  },
-  {
-    path: "/login",
-    element: <Login />,
-  },
-]);
+// Definim cum va comunica frontend-ul cu backend-ul tău FastAPI
+// Deocamdată punem URL-ul de bază unde va rula backend-ul
+const dataProvider = simpleRestProvider('http://localhost:8000/api');
 
-// Componenta principală care randează router-ul
 function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <Admin dataProvider={dataProvider} dashboard={Dashboard}>
+      {/* Aici punem paginile care NU sunt tabele standard (ex: Chat, Upload) */}
+      {/* <CustomRoutes>
+        <Route path="/upload" element={<Upload />} />
+        <Route path="/chat" element={<Chat />} />
+        <Route path="/reports" element={<Reports />} />
+      </CustomRoutes> */}
+      
+      {/* Mai târziu, când backend-ul va returna lista de rapoarte, 
+          vom adăuga aici o linie de genul:
+          <Resource name="reports" list={ReportList} /> 
+      */}
+    </Admin>
+  );
 }
 
 export default App;
