@@ -1,0 +1,44 @@
+const en = {
+  nav: {
+    dashboard: 'Dashboard',
+    upload: 'Upload',
+    chat: 'AI Chat',
+    reports: 'Reports',
+  },
+  sidebar: {
+    brand: 'CloudInsight',
+    tagline: 'AI Platform',
+    mainMenu: 'Main Menu',
+    signOut: 'Sign Out',
+  },
+  header: {
+    toggleTheme: 'Toggle theme',
+    notifications: 'Notifications',
+    noNotifications: 'No new notifications',
+    guest: 'Guest',
+  },
+  footer: {
+    copyright: '© {{year}} CloudInsight AI. All rights reserved.',
+    status: 'All systems operational',
+  },
+  login: {
+    title: 'CloudInsight AI',
+    subtitle: 'Sign in to your account',
+    button: 'Login',
+  },
+  dashboard: {
+    loading: 'Loading…',
+    error: 'Failed to load dashboard.',
+  },
+  chat: {
+    title: 'Chat Page',
+  },
+  reports: {
+    title: 'Reports Page',
+  },
+  upload: {
+    title: 'Upload Page',
+  },
+} as const
+
+export default en
