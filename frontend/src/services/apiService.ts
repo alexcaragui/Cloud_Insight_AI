@@ -1,45 +1,75 @@
-import axios, { type AxiosRequestConfig, type AxiosResponse } from 'axios'
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/$/, '')
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? '/api',
-  headers: { 'Content-Type': 'application/json' },
-  timeout: 15_000,
-})
+type RequestOptions = {
+  signal?: AbortSignal
+  headers?: Record<string, string>
+}
 
-api.interceptors.request.use((config) => {
+async function request<T>(
+  method: string,
+  url: string,
+  body?: unknown,
+  options?: RequestOptions,
+): Promise<T> {
   const token = localStorage.getItem('token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
 
-api.interceptors.response.use(
-  (res) => res,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('auth_user')
-      window.location.href = '/login'
-    }
-    return Promise.reject(error)
-  },
-)
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...options?.headers,
+  }
+  if (token) headers['Authorization'] = `Bearer ${token}`
 
-const unwrap = <T>(res: AxiosResponse<T>): T => res.data
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 15_000)
+
+  const externalSignal = options?.signal
+  if (externalSignal) {
+    externalSignal.addEventListener('abort', () => controller.abort())
+  }
+
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}${url}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timeout)
+  }
+
+  if (res.status === 401) {
+    localStorage.removeItem('token')
+    localStorage.removeItem('auth_user')
+    window.location.href = '/login'
+  }
+
+  if (!res.ok) {
+    throw new Error(`${method} ${url} → ${res.status} ${res.statusText}`)
+  }
+
+  if (res.status === 204 || res.headers.get('content-length') === '0') {
+    return undefined as T
+  }
+
+  return res.json() as Promise<T>
+}
 
 export const apiService = {
-  get<T>(url: string, config?: AxiosRequestConfig) {
-    return api.get<T>(url, config).then(unwrap)
+  get<T>(url: string, options?: RequestOptions) {
+    return request<T>('GET', url, undefined, options)
   },
-  post<T>(url: string, data?: unknown, config?: AxiosRequestConfig) {
-    return api.post<T>(url, data, config).then(unwrap)
+  post<T>(url: string, data?: unknown, options?: RequestOptions) {
+    return request<T>('POST', url, data, options)
   },
-  put<T>(url: string, data?: unknown, config?: AxiosRequestConfig) {
-    return api.put<T>(url, data, config).then(unwrap)
+  put<T>(url: string, data?: unknown, options?: RequestOptions) {
+    return request<T>('PUT', url, data, options)
   },
-  patch<T>(url: string, data?: unknown, config?: AxiosRequestConfig) {
-    return api.patch<T>(url, data, config).then(unwrap)
+  patch<T>(url: string, data?: unknown, options?: RequestOptions) {
+    return request<T>('PATCH', url, data, options)
   },
-  delete<T>(url: string, config?: AxiosRequestConfig) {
-    return api.delete<T>(url, config).then(unwrap)
+  delete<T>(url: string, options?: RequestOptions) {
+    return request<T>('DELETE', url, undefined, options)
   },
 }
