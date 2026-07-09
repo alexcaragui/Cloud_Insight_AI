@@ -1,39 +1,37 @@
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 
-// Importăm paginile
-import Dashboard from './pages/Dashboard';
-import Upload from './pages/Upload';
-import Chat from './pages/Chat';
-import Reports from './pages/Reports';
-import Login from './pages/Login';
+import Layout from './components/layout/Layout'
+import { AuthGuard } from './components/guards/AuthGuard'
+import Dashboard from './pages/Dashboard'
+import Upload from './pages/Upload'
+import Chat from './pages/Chat'
+import Reports from './pages/Reports'
+import Login from './pages/Login'
 
-// Definim rutele
 const router = createBrowserRouter([
   {
-    path: "/",
-    element: <Dashboard />,
-  },
-  {
-    path: "/upload",
-    element: <Upload />,
-  },
-  {
-    path: "/chat",
-    element: <Chat />,
-  },
-  {
-    path: "/reports",
-    element: <Reports />,
-  },
-  {
-    path: "/login",
+    path: '/login',
     element: <Login />,
   },
-]);
+  {
+    element: <AuthGuard />,
+    children: [
+      {
+        path: '/',
+        element: <Layout />,
+        children: [
+          { index: true, element: <Dashboard /> },
+          { path: 'upload', element: <Upload /> },
+          { path: 'chat', element: <Chat /> },
+          { path: 'reports', element: <Reports /> },
+        ],
+      },
+    ],
+  },
+])
 
-// Componenta principală care randează router-ul
 function App() {
-  return <RouterProvider router={router} />;
+  return <RouterProvider router={router} />
 }
 
-export default App;
+export default App
