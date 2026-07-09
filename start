@@ -1,0 +1,44 @@
+To run everything:
+
+docker compose up --build
+
+Then log in at http://localhost:5173 with:
+
+Email: admin@cloudinsight.ai
+Password: password123
+
+Localy
+1 — DB only (Docker)
+
+
+docker compose up db -d
+Postgres starts on localhost:5432. Stop it later with docker compose stop db.
+
+2 — Backend (uvicorn)
+
+First time only — create the .env and install deps:
+
+
+cd backend
+cp .env.example .env
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+Then run:
+
+
+uvicorn app.main:app --host 0.0.0.0 --port 6000 --reload
+3 — Frontend (pnpm)
+
+
+cd frontend
+pnpm install   # first time only
+pnpm dev
+Opens at http://localhost:3000.
+
+All together (3 terminals):
+
+Terminal	Command
+1	docker compose up db -d
+2	cd backend && source venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 6000 --reload
+3	cd frontend && pnpm dev

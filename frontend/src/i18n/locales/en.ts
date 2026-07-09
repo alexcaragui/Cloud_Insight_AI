@@ -24,7 +24,12 @@ const en = {
   login: {
     title: 'CloudInsight AI',
     subtitle: 'Sign in to your account',
-    button: 'Login',
+    email: 'Email',
+    emailPlaceholder: 'you@example.com',
+    password: 'Password',
+    passwordPlaceholder: '••••••••',
+    button: 'Sign in',
+    error: 'Invalid email or password',
   },
   dashboard: {
     loading: 'Loading…',
