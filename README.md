@@ -1,4 +1,4 @@
-# AnomaScan
+# Cloud Insight Ai
 
 YOLO-powered video analysis web application. Upload a video, run object detection with a configurable model and confidence threshold, browse detection events, and fine-tune a custom YOLO model on your own labeled dataset.
 
