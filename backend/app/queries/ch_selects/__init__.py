@@ -1,0 +1,15 @@
+from app.queries.ch_selects.constants import (  # ClickHouse SELECT query templates
+    CH_TEST_CONNECTION,
+    CH_PAGINATED_COUNT, CH_PAGINATED_ROWS,
+    CH_SUMMARY_COUNT, CH_SUMMARY_ROWS,
+    CH_API_LOGS_SUMMARY,
+    CH_APP_LOGS_SUMMARY
+)
+
+__all__ = [
+    "CH_TEST_CONNECTION",
+    "CH_PAGINATED_COUNT", "CH_PAGINATED_ROWS",
+    "CH_SUMMARY_COUNT", "CH_SUMMARY_ROWS",
+    "CH_API_LOGS_SUMMARY",
+    "CH_APP_LOGS_SUMMARY"
+]

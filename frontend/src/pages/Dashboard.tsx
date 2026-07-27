@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { useGet } from '../hooks/useApi'
 import { dashboardService } from '../services/dashboardService'
+import { Imported_Module } from '../modules/Imported_Module'
 
 export default function Dashboard() {
   const { t } = useTranslation()
@@ -11,7 +12,9 @@ export default function Dashboard() {
 
   return (
     <div className="p-6">
-      <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{data}</p>
+      <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">
+        <Imported_Module />
+      </p>
     </div>
   )
 }
