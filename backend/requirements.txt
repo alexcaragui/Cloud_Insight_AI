@@ -2,6 +2,6 @@ fastapi
 uvicorn[standard]
 python-dotenv
 sqlalchemy
-clickhouse-driver
+clickhouse-connect
 python-multipart
 httpx

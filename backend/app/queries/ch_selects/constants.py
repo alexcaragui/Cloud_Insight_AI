@@ -1,11 +1,12 @@
 # {table}, {where}, {select_cols}, {order_col} are str.format() placeholders.
-# %(name)s tokens are clickhouse-driver parameter slots — not touched by format().
+# {{limit:UInt32}} / {{offset:UInt32}} are double-braced so str.format() emits literal
+# {limit:UInt32} / {offset:UInt32} — consumed by clickhouse-connect as server-side params.
 
 CH_TEST_CONNECTION = "SELECT 1"  # minimal connectivity probe; raises on unreachable ClickHouse
 CH_PAGINATED_COUNT = "SELECT count() FROM {table} {where}"  # total-row count for the pagination metadata field
 CH_PAGINATED_ROWS = (
     "SELECT {select_cols} FROM {table} {where}"
-    " ORDER BY {order_col} DESC LIMIT %(limit)s OFFSET %(offset)s"
+    " ORDER BY {order_col} DESC LIMIT {{limit:UInt32}} OFFSET {{offset:UInt32}}"
 )
 CH_SUMMARY_COUNT = (
     "SELECT count() FROM"
@@ -17,7 +18,7 @@ SELECT toStartOfHour(event_time) AS bucket, event_type,
 FROM {table} {where}
 GROUP BY bucket, event_type
 ORDER BY bucket DESC
-LIMIT %(limit)s OFFSET %(offset)s
+LIMIT {{limit:UInt32}} OFFSET {{offset:UInt32}}
 """  # hourly GROUP BY aggregate used by all module and bot summary endpoints
 
 CH_API_LOGS_SUMMARY = """
@@ -29,7 +30,7 @@ SELECT toStartOfHour(event_time) AS bucket, event_type, path, status_code,
 FROM api_logs {where}
 GROUP BY bucket, event_type, path, status_code
 ORDER BY bucket DESC
-LIMIT %(limit)s OFFSET %(offset)s
+LIMIT {{limit:UInt32}} OFFSET {{offset:UInt32}}
 """  # richer summary for the API logs UI; includes path, status, latency, and error counts
 
 CH_APP_LOGS_SUMMARY = """
@@ -38,5 +39,5 @@ SELECT toStartOfHour(event_time) AS bucket, event_type, caller,
 FROM app_logs {where}
 GROUP BY bucket, event_type, caller
 ORDER BY bucket DESC
-LIMIT %(limit)s OFFSET %(offset)s
+LIMIT {{limit:UInt32}} OFFSET {{offset:UInt32}}
 """  # hourly summary for the app logs UI; groups by event type and caller
