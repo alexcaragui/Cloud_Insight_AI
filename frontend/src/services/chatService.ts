@@ -1,59 +1,66 @@
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/$/, '')
+const _apiBase = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/$/, '')
 
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem('token')
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
+// Convert http(s) base URL to ws(s); handle relative paths too
+const WS_BASE = _apiBase.startsWith('http')
+  ? _apiBase.replace(/^http/, 'ws')
+  : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${_apiBase}`
 
 export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
 }
 
-export function streamChat(
-  model: string,
-  messages: ChatMessage[],
-  onToken: (token: string) => void,
-  onDone: () => void,
-  onError: (err: Error) => void,
-): () => void {
-  const controller = new AbortController()
+type Handlers = {
+  onToken: (token: string) => void
+  onDone: () => void
+  onError: (msg: string) => void
+}
 
-  fetch(`${BASE_URL}/ollama/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ model, messages }),
-    signal: controller.signal,
-  })
-    .then(async (res) => {
-      if (!res.ok || !res.body) {
-        onError(new Error(`Chat request failed: ${res.status}`))
-        return
-      }
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6))
-              if (data.message?.content) onToken(data.message.content)
-              if (data.done) onDone()
-            } catch {}
-          }
-        }
-      }
-      onDone()
-    })
-    .catch((err: Error) => {
-      if (err.name !== 'AbortError') onError(err)
-    })
+export class ChatSocket {
+  private ws: WebSocket
+  private handlers: Handlers | null = null
+  private pendingPayload: string | null = null
 
-  return () => controller.abort()
+  constructor(onConnectionError: (msg: string) => void) {
+    const token = localStorage.getItem('token')
+    const url = token
+      ? `${WS_BASE}/ollama/chat/ws?token=${encodeURIComponent(token)}`
+      : `${WS_BASE}/ollama/chat/ws`
+
+    this.ws = new WebSocket(url)
+
+    this.ws.onopen = () => {
+      if (this.pendingPayload !== null) {
+        this.ws.send(this.pendingPayload)
+        this.pendingPayload = null
+      }
+    }
+
+    this.ws.onmessage = (e) => {
+      if (!this.handlers) return
+      try {
+        const msg = JSON.parse(e.data as string) as { type: string; content?: string; message?: string }
+        if (msg.type === 'token') this.handlers.onToken(msg.content ?? '')
+        else if (msg.type === 'done') this.handlers.onDone()
+        else if (msg.type === 'error') this.handlers.onError(msg.message ?? 'Unknown error')
+      } catch {}
+    }
+
+    this.ws.onerror = () => onConnectionError('WebSocket connection error')
+  }
+
+  send(model: string, messages: ChatMessage[], handlers: Handlers) {
+    this.handlers = handlers
+    const payload = JSON.stringify({ model, messages })
+    if (this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(payload)
+    } else {
+      // Queue until the connection is open
+      this.pendingPayload = payload
+    }
+  }
+
+  close() {
+    this.ws.close()
+  }
 }

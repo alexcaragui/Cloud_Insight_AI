@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useModel, DEFAULT_MODEL } from '../context/ModelContext'
-import { streamChat, type ChatMessage } from '../services/chatService'
+import { ChatSocket, type ChatMessage } from '../services/chatService'
 
 export default function Chat() {
   const { t } = useTranslation()
@@ -12,8 +12,14 @@ export default function Chat() {
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const cancelRef = useRef<(() => void) | null>(null)
+  const socketRef = useRef<ChatSocket | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    const socket = new ChatSocket((msg) => setError(msg))
+    socketRef.current = socket
+    return () => socket.close()
+  }, [])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -21,7 +27,7 @@ export default function Chat() {
 
   function handleSend() {
     const text = input.trim()
-    if (!text || isStreaming) return
+    if (!text || isStreaming || !socketRef.current) return
     setError(null)
 
     const userMsg: ChatMessage = { role: 'user', content: text }
@@ -33,10 +39,8 @@ export default function Chat() {
     const assistantPlaceholder: ChatMessage = { role: 'assistant', content: '' }
     setMessages([...nextMessages, assistantPlaceholder])
 
-    cancelRef.current = streamChat(
-      DEFAULT_MODEL,
-      nextMessages,
-      (token) => {
+    socketRef.current.send(DEFAULT_MODEL, nextMessages, {
+      onToken: (token) => {
         setMessages((prev) => {
           const updated = [...prev]
           const last = updated[updated.length - 1]
@@ -46,16 +50,12 @@ export default function Chat() {
           return updated
         })
       },
-      () => {
-        setIsStreaming(false)
-        cancelRef.current = null
-      },
-      () => {
+      onDone: () => setIsStreaming(false),
+      onError: () => {
         setIsStreaming(false)
         setError(t('chat.errorSending'))
-        cancelRef.current = null
       },
-    )
+    })
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {

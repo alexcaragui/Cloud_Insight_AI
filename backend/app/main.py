@@ -28,8 +28,9 @@ async def lifespan(app: FastAPI):
 
     ch = get_ch()  # raw adapter needed for DDL operations (migrations, ensure_* calls)
     ch.run_migrations()  # rename legacy tables/columns before DDL provisioning
-    ch.ensure_api_logs()  # CREATE TABLE IF NOT EXISTS api_logs
-    ch.ensure_app_logs()  # CREATE TABLE IF NOT EXISTS app_logs
+    ch.ensure_api_logs()   # CREATE TABLE IF NOT EXISTS api_logs
+    ch.ensure_app_logs()   # CREATE TABLE IF NOT EXISTS app_logs
+    ch.ensure_chat_logs()  # CREATE TABLE IF NOT EXISTS chat_logs
     get_logger().app("app.start", "anomascan", message="anomascan backend started")  # first lifecycle event; signals successful startup
 
     await ollama_service.ensure_model(OLLAMA_MODEL)

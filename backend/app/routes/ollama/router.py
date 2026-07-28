@@ -1,6 +1,7 @@
+import uuid
 from typing import List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -39,20 +40,15 @@ async def delete_model(name: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-class ChatMessage(BaseModel):
-    role: str
-    content: str
-
-
-class ChatRequest(BaseModel):
-    model: str
-    messages: List[ChatMessage]
-
-
-@router.post("/chat")
-async def chat(req: ChatRequest):
-    return StreamingResponse(
-        ollama_service.chat_stream(req.model, [m.model_dump() for m in req.messages]),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+@router.websocket("/chat/ws")
+async def chat_ws(websocket: WebSocket):
+    await websocket.accept()
+    session_id = str(uuid.uuid4())
+    try:
+        while True:
+            data = await websocket.receive_json()
+            model = data.get("model", "qwen2.5:7b")
+            messages = data.get("messages", [])
+            await ollama_service.handle_chat_ws(websocket, session_id, model, messages)
+    except WebSocketDisconnect:
+        pass

@@ -20,7 +20,18 @@ class AppLogEntry(BaseModel):
     caller: str               # e.g. "fe", "helpers/process_video"
     message: str
     details: str = "{}"       # JSON
-    
+
+    @classmethod
+    def col_names(cls) -> list[str]:
+        return list(cls.model_fields.keys())
+
+class ChatLogEntry(BaseModel):
+    session_id: str
+    model: str
+    user_message: str
+    assistant_reply: str
+    duration_ms: float = 0.0
+
     @classmethod
     def col_names(cls) -> list[str]:
         return list(cls.model_fields.keys())

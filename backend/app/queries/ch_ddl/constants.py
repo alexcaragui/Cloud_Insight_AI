@@ -26,3 +26,16 @@ CREATE TABLE IF NOT EXISTS app_logs (
 ORDER BY event_time
 TTL toDateTime(event_time) + INTERVAL 30 DAY
 """  # DDL for the platform lifecycle log table; auto-expires rows after 30 days
+
+CH_DDL_CHAT_LOGS = """
+CREATE TABLE IF NOT EXISTS chat_logs (
+    event_time       DateTime64(3) DEFAULT now64(),
+    session_id       String,
+    model            LowCardinality(String),
+    user_message     String,
+    assistant_reply  String,
+    duration_ms      Float32 DEFAULT 0
+) ENGINE = MergeTree()
+ORDER BY event_time
+TTL toDateTime(event_time) + INTERVAL 90 DAY
+"""  # one row per user/assistant exchange; session_id groups turns within a conversation

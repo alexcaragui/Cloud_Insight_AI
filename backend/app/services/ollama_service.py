@@ -1,4 +1,6 @@
 import asyncio
+import json
+import time
 from typing import AsyncIterator
 
 import httpx
@@ -63,3 +65,48 @@ async def ensure_model(name: str) -> None:
     """Pull the model in the background if it is not already present."""
     if not await _is_model_present(name):
         asyncio.create_task(_background_pull(name))
+
+
+async def handle_chat_ws(websocket, session_id: str, model: str, messages: list) -> None:
+    """Stream an Ollama chat response over an open WebSocket and log the exchange to ClickHouse."""
+    from app.database import get_ch
+    from app.schemas.logs import ChatLogEntry
+
+    start = time.monotonic()
+    reply_parts: list[str] = []
+    user_message = messages[-1]["content"] if messages else ""
+
+    try:
+        async with httpx.AsyncClient(timeout=None) as client:
+            async with client.stream(
+                "POST", f"{OLLAMA_URL}/api/chat",
+                json={"model": model, "messages": messages, "stream": True},
+            ) as r:
+                r.raise_for_status()
+                async for line in r.aiter_lines():
+                    if not line:
+                        continue
+                    chunk = json.loads(line)
+                    token = chunk.get("message", {}).get("content", "")
+                    if token:
+                        reply_parts.append(token)
+                        await websocket.send_json({"type": "token", "content": token})
+                    if chunk.get("done"):
+                        break
+
+        await websocket.send_json({"type": "done"})
+
+        entry = ChatLogEntry(
+            session_id=session_id,
+            model=model,
+            user_message=user_message,
+            assistant_reply="".join(reply_parts),
+            duration_ms=round((time.monotonic() - start) * 1000, 2),
+        )
+        await asyncio.to_thread(get_ch().write_chat_log, entry)
+
+    except Exception as exc:
+        try:
+            await websocket.send_json({"type": "error", "message": str(exc)})
+        except Exception:
+            pass

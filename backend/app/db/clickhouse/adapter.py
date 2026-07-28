@@ -1,15 +1,15 @@
 from datetime import datetime, timezone
 from clickhouse_driver import Client
 
-from app.queries.ch_ddl import CH_DDL_API_LOGS, CH_DDL_APP_LOGS
-from app.queries.ch_inserts import CH_INSERT_API_LOGS, CH_INSERT_APP_LOGS
+from app.queries.ch_ddl import CH_DDL_API_LOGS, CH_DDL_APP_LOGS, CH_DDL_CHAT_LOGS
+from app.queries.ch_inserts import CH_INSERT_API_LOGS, CH_INSERT_APP_LOGS, CH_INSERT_CHAT_LOGS
 from app.queries.ch_selects import (
     CH_TEST_CONNECTION,
     CH_PAGINATED_COUNT, CH_PAGINATED_ROWS,
     CH_SUMMARY_COUNT, CH_SUMMARY_ROWS,
     CH_API_LOGS_SUMMARY, CH_APP_LOGS_SUMMARY,
 )
-from app.schemas.logs import ApiLogEntry, AppLogEntry
+from app.schemas.logs import ApiLogEntry, AppLogEntry, ChatLogEntry
 from app.db.clickhouse.utils import _month_start
 
 # SELECT column lists — event_time is added here because it's DB-generated (not in the model)
@@ -45,6 +45,9 @@ class ClickHouseLogAdapter:
 
     def ensure_app_logs(self) -> None:
         self._client.execute(CH_DDL_APP_LOGS)
+
+    def ensure_chat_logs(self) -> None:
+        self._client.execute(CH_DDL_CHAT_LOGS)
 
     # ------------------------------------------------------------------
     # Shared query helpers
@@ -169,6 +172,12 @@ class ClickHouseLogAdapter:
     def write_app_log(self, entry: AppLogEntry) -> None:
         self._client.execute(
             CH_INSERT_APP_LOGS,
+            [tuple(entry.model_dump().values())],
+        )
+
+    def write_chat_log(self, entry: ChatLogEntry) -> None:
+        self._client.execute(
+            CH_INSERT_CHAT_LOGS,
             [tuple(entry.model_dump().values())],
         )
 

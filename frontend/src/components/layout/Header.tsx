@@ -9,6 +9,7 @@ const ROUTE_KEYS: Record<string, string> = {
   '/upload': 'nav.upload',
   '/chat': 'nav.chat',
   '/reports': 'nav.reports',
+  '/models': 'nav.models',
 }
 
 function getInitials(name: string): string {
