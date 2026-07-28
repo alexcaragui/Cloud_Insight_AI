@@ -1,14 +1,14 @@
-import { useTranslation } from 'react-i18next'
-import { useGet } from '../hooks/useApi'
-import { dashboardService } from '../services/dashboardService'
+// import { useTranslation } from 'react-i18next'
+// import { useGet } from '../hooks/useApi'
+// import { dashboardService } from '../services/dashboardService'
 import { Imported_Module } from '../modules/Imported_Module'
 
 export default function Dashboard() {
-  const { t } = useTranslation()
-  const { data, isLoading, isError } = useGet<string>(['dashboard'], dashboardService.getDashboard)
+  // const { t } = useTranslation()
+  // const { data, isLoading, isError } = useGet<string>(['dashboard'], dashboardService.getDashboard)
 
-  if (isLoading) return <p className="p-6 text-slate-500">{t('dashboard.loading')}</p>
-  if (isError) return <p className="p-6 text-red-500">{t('dashboard.error')}</p>
+  // if (isLoading) return <p className="p-6 text-slate-500">{t('dashboard.loading')}</p>
+  // if (isError) return <p className="p-6 text-red-500">{t('dashboard.error')}</p>
 
   return (
     <div className="p-6">

@@ -1,18 +1,24 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 
 const MAX_BYTES = 50 * 1024 * 1024; // 50 MB — matches backend validation and UX copy
 const ALLOWED = new Set(['csv', 'xlsx', 'json']); // accepted file extensions (lowercase)
+
+type FileDropzoneProps = {
+  onFiles?: (files: File[]) => void;
+  onError?: (message: string) => void;
+  uploading?: boolean;
+};
 
 /**
  * Drag-and-drop / click-to-browse file input.
  * Validates type and size on the client side; calls onFiles with valid File[]
  * and onError with a human-readable message for each rejected file.
  */
-export function FileDropzone({ onFiles, onError, uploading = false }) {
+export function FileDropzone({ onFiles, onError, uploading = false }: FileDropzoneProps) {
   const [dragging, setDragging] = useState(false); // true while a drag is over the zone
-  const inputRef = useRef(null); // hidden <input type="file"> used for click-to-browse
+  const inputRef = useRef<HTMLInputElement | null>(null); // hidden <input type="file"> used for click-to-browse
 
-  function validate(files) {
+  function validate(files: File[]) {
     const valid = []; // files that pass all client-side checks
     for (const file of files) {
       const ext = (file.name.split('.').pop() ?? '').toLowerCase(); // extract extension
@@ -30,14 +36,14 @@ export function FileDropzone({ onFiles, onError, uploading = false }) {
     if (valid.length) onFiles?.(valid); // only notify if there is at least one valid file
   }
 
-  function handleDrop(e) {
+  function handleDrop(e: { preventDefault: () => void; dataTransfer: { files: any; }; }) {
     e.preventDefault();
     setDragging(false);
     if (uploading) return; // ignore drops while a previous upload is still in-flight
     validate(Array.from(e.dataTransfer?.files ?? []));
   }
 
-  function handleInputChange(e) {
+  function handleInputChange(e: { target: { files: any; value: string; }; }) {
     validate(Array.from(e.target.files ?? []));
     e.target.value = ''; // reset so the same file can be selected again
   }
@@ -50,12 +56,12 @@ export function FileDropzone({ onFiles, onError, uploading = false }) {
     border: `2px dashed ${dragging ? '#6366f1' : '#334155'}`, // indigo highlight on hover
     borderRadius: '12px',
     padding: '32px 24px',
-    textAlign: 'center',
+    textAlign: 'center' as const,
     marginBottom: '20px',
     transition: 'border-color 0.15s, background 0.15s',
     cursor: uploading ? 'not-allowed' : 'pointer',
     background: dragging ? 'rgba(99,102,241,0.06)' : 'transparent',
-    userSelect: 'none',
+    userSelect: 'none' as const,
     outline: 'none',
   };
 

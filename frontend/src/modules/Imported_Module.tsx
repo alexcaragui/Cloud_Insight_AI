@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { FileDropzone } from './FileDropzone';
 import { ToastStack } from './Toast';
 
@@ -7,9 +7,21 @@ const STATUS_COLORS = {
   ready:      { bg: '#14532d', text: '#4ade80', dot: '#22c55e' },
   processing: { bg: '#1e3a5f', text: '#60a5fa', dot: '#3b82f6' },
   error:      { bg: '#450a0a', text: '#f87171', dot: '#ef4444' },
-};
+} as const;
 
-function StatCard({ label, value, sub }) {
+type StatusType = keyof typeof STATUS_COLORS;
+
+interface DataSource {
+  id: string;
+  name: string;
+  type: string;
+  rows: number;
+  size: string;
+  status: StatusType;
+  updated: string;
+}
+
+function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
     <div style={s.statCard}>
       <p style={s.statValue}>{value}</p>
@@ -19,8 +31,8 @@ function StatCard({ label, value, sub }) {
   );
 }
 
-function StatusBadge({ status }) {
-  const c = STATUS_COLORS[status] ?? STATUS_COLORS.ready; // fall back to ready colours for unknown statuses
+function StatusBadge({ status }: { status: StatusType }) {
+  const c = STATUS_COLORS[status] ?? STATUS_COLORS.ready;
   return (
     <span style={{ ...s.badge, background: c.bg, color: c.text }}>
       <span style={{ ...s.badgeDot, background: c.dot }} />
@@ -32,88 +44,102 @@ function StatusBadge({ status }) {
 // API endpoint routed through the core proxy to the CloudInsight AI plugin backend
 const UPLOAD_ENDPOINT = '/api/plugin/cloudInsightAI/upload';
 
-export function Imported_Module() {
-  const [sources, setSources] = useState([]); // table rows (uploaded files)
-  const [toasts, setToasts] = useState([]); // notification stack
-  const [uploading, setUploading] = useState(false); // true while any file upload is in-flight
+type ToastType = 'error' | 'success';
 
-  // Append a new toast; id uses timestamp + random fraction to survive rapid fire calls
-  function addToast(type, title, body) {
+type Toast = {
+  id: string | number;
+  type: ToastType;
+  title: string;
+  body: any;
+};
+
+function useToasts() {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  function addToast(type: ToastType, title: string, body: any) {
     const id = Date.now() + Math.random();
     setToasts(prev => [...prev, { id, type, title, body }]);
   }
 
-  // Remove a toast by id; wrapped in useCallback so ToastStack can memoise without re-renders
-  const dismissToast = useCallback(id => {
+  const dismissToast = useCallback((id: string | number) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  // Called by FileDropzone when a file fails client-side validation
-  function handleValidationError(msg) {
+  return { toasts, addToast, dismissToast };
+}
+
+function useDataSources(addToast: (type: ToastType, title: string, body: any) => void) {
+  const [sources, setSources] = useState<DataSource[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  function handleValidationError(msg: any) {
     addToast('error', 'Invalid file', msg);
   }
 
-  // Called by FileDropzone with the list of client-validated files ready for upload
-  async function handleFiles(files) {
+  async function handleFiles(files: any[]) {
     setUploading(true);
 
-    // Add all files as "processing" rows immediately so the table reflects in-flight state
-    const newRows = files.map((f, i) => ({
-      id: `upload-${Date.now()}-${i}`, // unique per-upload key; avoids collision with seed ids
+    const newRows: DataSource[] = files.map((f, i) => ({
+      id: `upload-${Date.now()}-${i}`,
       name: f.name,
-      type: f.name.split('.').pop().toUpperCase(), // derive display type from extension
+      type: f.name.split('.').pop().toUpperCase(),
       rows: 0,
       size: f.size > 1_048_576 ? `${(f.size / 1_048_576).toFixed(1)} MB` : `${Math.round(f.size / 1024)} KB`,
       status: 'processing',
       updated: 'Just now',
     }));
-    setSources(prev => [...newRows, ...prev]); // new rows appear at the top of the table
+    setSources(prev => [...newRows, ...prev]);
 
-    const token = localStorage.getItem('token'); // JWT stored by the host app's auth flow
+    const token = localStorage.getItem('token');
 
     for (const [idx, file] of files.entries()) {
-      const rowId = newRows[idx].id; // stable reference to the processing row for this file
+      const rowId = newRows[idx].id;
       const formData = new FormData();
-      formData.append('file', file); // binary payload
-      formData.append('bot_identifier', 'CloudInsight Monitor'); // audit label forwarded to backend
+      formData.append('file', file);
+      formData.append('bot_identifier', 'CloudInsight Monitor');
 
       try {
         const res = await fetch(UPLOAD_ENDPOINT, {
           method: 'POST',
-          headers: token ? { Authorization: `Bearer ${token}` } : {}, // attach JWT when present
-          body: formData, // multipart/form-data; Content-Type is set automatically by the browser
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData,
         });
 
         const data = await res.json();
 
         if (res.ok) {
-          // Update the row to "ready" and replace the placeholder row count with the backend's value
           setSources(prev => prev.map(r =>
             r.id === rowId
-              ? { ...r, status: 'ready', rows: data.record_count ?? 0, updated: 'Just now' }
+              ? { ...r, status: 'ready' as const, rows: data.record_count ?? 0, updated: 'Just now' }
               : r,
           ));
           addToast('success', 'Ingestion complete', data.message);
         } else {
           setSources(prev => prev.map(r =>
-            r.id === rowId ? { ...r, status: 'error', updated: 'Just now' } : r,
+            r.id === rowId ? { ...r, status: 'error' as const, updated: 'Just now' } : r,
           ));
           addToast('error', 'Ingestion failed', data.detail ?? data.message ?? 'Upload failed.');
         }
       } catch (err) {
-        // Network-level error (backend unreachable, CORS, timeout, etc.)
         setSources(prev => prev.map(r =>
-          r.id === rowId ? { ...r, status: 'error', updated: 'Just now' } : r,
+          r.id === rowId ? { ...r, status: 'error' as const, updated: 'Just now' } : r,
         ));
-        addToast('error', 'Network error', err.message ?? 'Could not reach the backend.');
+        addToast('error', 'Network error', err instanceof Error ? err.message : 'Could not reach the backend.');
       }
     }
 
     setUploading(false);
   }
 
-  const totalRows = sources.reduce((sum, s) => sum + s.rows, 0); // aggregate across all sources
-  const readyCount = sources.filter(s => s.status === 'ready').length; // for the stat card sub-label
+  return { sources, uploading, handleFiles, handleValidationError };
+}
+
+export function Imported_Module() {
+  const { toasts, addToast, dismissToast } = useToasts();
+  const { sources, uploading, handleFiles, handleValidationError } = useDataSources(addToast);
+
+  const totalRows = sources.reduce((sum, s) => sum + s.rows, 0);
+  const readyCount = sources.filter(s => s.status === 'ready').length;
 
   return (
     <div style={s.root}>
@@ -125,20 +151,17 @@ export function Imported_Module() {
         <button style={s.primaryBtn}>+ New Connection</button>
       </div>
 
-      {/* Summary metrics row */}
       <div style={s.stats}>
         <StatCard label="Data Sources"  value={sources.length}             sub={`${readyCount} ready`} />
         <StatCard label="Total Records" value={totalRows.toLocaleString()} sub="across all sources" />
       </div>
 
-      {/* Drag-and-drop / click-to-browse upload zone */}
       <FileDropzone
         onFiles={handleFiles}
         onError={handleValidationError}
         uploading={uploading}
       />
 
-      {/* Data sources table */}
       <div style={s.tableWrap}>
         <div style={s.tableHeader}>
           <p style={s.tableTitle}>Data Sources</p>
@@ -171,7 +194,6 @@ export function Imported_Module() {
         </table>
       </div>
 
-      {/* Global toast notification stack */}
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
@@ -184,7 +206,7 @@ const s = {
     color: '#e2e8f0',
     minHeight: '100%',
     padding: '28px 32px',
-    boxSizing: 'border-box',
+    boxSizing: 'border-box' as const,
   },
   header: {
     display: 'flex',
@@ -192,7 +214,7 @@ const s = {
     justifyContent: 'space-between',
     marginBottom: '24px',
     gap: '16px',
-    flexWrap: 'wrap',
+    flexWrap: 'wrap' as const,
   },
   title: {
     margin: '0 0 4px',
@@ -215,7 +237,7 @@ const s = {
     fontSize: '13px',
     fontWeight: 600,
     cursor: 'pointer',
-    whiteSpace: 'nowrap',
+    whiteSpace: 'nowrap' as const,
   },
   stats: {
     display: 'grid',
@@ -241,7 +263,7 @@ const s = {
     fontSize: '12px',
     fontWeight: 600,
     color: '#94a3b8',
-    textTransform: 'uppercase',
+    textTransform: 'uppercase' as const,
     letterSpacing: '0.06em',
   },
   statSub: {
@@ -267,7 +289,7 @@ const s = {
     fontSize: '13px',
     fontWeight: 600,
     color: '#94a3b8',
-    textTransform: 'uppercase',
+    textTransform: 'uppercase' as const,
     letterSpacing: '0.06em',
   },
   tableActions: {
@@ -285,16 +307,16 @@ const s = {
   },
   table: {
     width: '100%',
-    borderCollapse: 'collapse',
+    borderCollapse: 'collapse' as const,
   },
   th: {
     padding: '10px 16px',
     fontSize: '11px',
     fontWeight: 600,
     color: '#475569',
-    textTransform: 'uppercase',
+    textTransform: 'uppercase' as const,
     letterSpacing: '0.06em',
-    textAlign: 'left',
+    textAlign: 'left' as const,
     borderBottom: '1px solid #1e293b',
     background: '#162032',
   },
@@ -305,7 +327,7 @@ const s = {
     padding: '12px 16px',
     fontSize: '13px',
     color: '#cbd5e1',
-    verticalAlign: 'middle',
+    verticalAlign: 'middle' as const,
   },
   fileName: {
     fontWeight: 500,
@@ -329,7 +351,7 @@ const s = {
     fontSize: '11px',
     fontWeight: 600,
     letterSpacing: '0.03em',
-    textTransform: 'capitalize',
+    textTransform: 'capitalize' as const,
   },
   badgeDot: {
     width: '6px',

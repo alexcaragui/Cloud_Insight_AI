@@ -28,6 +28,7 @@ export function ModelProvider({ children }: { children: React.ReactNode }) {
   const [isPulling, setIsPulling] = useState(false)
   const [pullProgress, setPullProgress] = useState<PullProgress | null>(null)
   const cancelPullRef = useRef<(() => void) | null>(null)
+  const digestMapRef = useRef<Record<string, { completed: number; total: number }>>({})
 
   const refresh = useCallback(async () => {
     try {
@@ -48,11 +49,28 @@ export function ModelProvider({ children }: { children: React.ReactNode }) {
   const startPull = useCallback(
     (name = DEFAULT_MODEL) => {
       if (isPulling) return
+      digestMapRef.current = {}
       setIsPulling(true)
       setPullProgress({ status: 'starting' })
       cancelPullRef.current = pullModelStream(
         name,
-        (progress) => setPullProgress(progress),
+        (progress) => {
+          const map = digestMapRef.current
+          if (progress.digest && progress.total != null) {
+            map[progress.digest] = {
+              completed: progress.completed ?? map[progress.digest]?.completed ?? 0,
+              total: Math.max(progress.total, map[progress.digest]?.total ?? 0),
+            }
+          }
+          const entries = Object.values(map)
+          if (entries.length > 0 && progress.total != null) {
+            const totalCompleted = entries.reduce((s, e) => s + e.completed, 0)
+            const totalBytes = entries.reduce((s, e) => s + e.total, 0)
+            setPullProgress({ status: progress.status, completed: totalCompleted, total: totalBytes, digest: progress.digest })
+          } else {
+            setPullProgress(progress)
+          }
+        },
         async () => {
           setIsPulling(false)
           setPullProgress(null)

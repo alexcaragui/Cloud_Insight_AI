@@ -1,12 +1,29 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 
 const AUTO_DISMISS_MS = 5000; // each toast disappears after 5 seconds unless manually closed
+
+type Toast = {
+  id: string | number;
+  type: 'success' | 'error';
+  title: string;
+  body: string;
+};
+
+type ToastStackProps = {
+  toasts: Toast[];
+  onDismiss: (id: string | number) => void;
+};
+
+type ToastItemProps = {
+  toast: Toast;
+  onDismiss: (id: string | number) => void;
+};
 
 /**
  * Fixed-position stack of toast notifications rendered in the bottom-right corner.
  * Toasts are rendered in reverse order so the newest one appears on top.
  */
-export function ToastStack({ toasts, onDismiss }) {
+export function ToastStack({ toasts, onDismiss }: ToastStackProps) {
   return (
     <div
       style={{
@@ -28,7 +45,7 @@ export function ToastStack({ toasts, onDismiss }) {
   );
 }
 
-function ToastItem({ toast, onDismiss }) {
+function ToastItem({ toast, onDismiss }: ToastItemProps) {
   // Auto-dismiss this toast after AUTO_DISMISS_MS; cancels if the toast is removed first
   useEffect(() => {
     const timer = setTimeout(() => onDismiss(toast.id), AUTO_DISMISS_MS);

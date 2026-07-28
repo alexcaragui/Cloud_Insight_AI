@@ -14,6 +14,7 @@ from app.routes import logs
 from app.routes.auth import router as auth_router
 from app.routes.ollama import router as ollama_router
 from app.services import ollama_service
+from app.settings import OLLAMA_MODEL
 
 
 async def _module_health_checker() -> None:
@@ -31,7 +32,7 @@ async def lifespan(app: FastAPI):
     ch.ensure_app_logs()  # CREATE TABLE IF NOT EXISTS app_logs
     get_logger().app("app.start", "anomascan", message="anomascan backend started")  # first lifecycle event; signals successful startup
 
-    await ollama_service.ensure_model(ollama_service.OLLAMA_MODEL)
+    await ollama_service.ensure_model(OLLAMA_MODEL)
 
     health_task = asyncio.create_task(_module_health_checker())
     yield

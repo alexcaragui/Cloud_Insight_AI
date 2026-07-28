@@ -1,12 +1,9 @@
 import asyncio
-import os
 from typing import AsyncIterator
 
 import httpx
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
-
+from app.settings import OLLAMA_URL
 
 async def list_models() -> dict:
     async with httpx.AsyncClient(timeout=10) as client:
