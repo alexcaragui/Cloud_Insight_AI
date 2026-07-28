@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../context/AuthContext'
@@ -6,12 +7,18 @@ export default function Login() {
   const { user, login } = useAuth()
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const [loading, setLoading] = useState(false)
 
   if (user) return <Navigate to="/" replace />
 
   async function handleLogin() {
-    await login({ email: '', password: '' })
-    navigate('/')
+    setLoading(true)
+    try {
+      await login({ email: '', password: '' })
+      navigate('/', { replace: true })
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -31,8 +38,15 @@ export default function Login() {
 
         <button
           onClick={handleLogin}
-          className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors"
+          disabled={loading}
+          className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2"
         >
+          {loading && (
+            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          )}
           {t('login.button')}
         </button>
       </div>

@@ -5,14 +5,15 @@ FastAPI service
 
 import asyncio
 from contextlib import asynccontextmanager
-import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from fastapi.staticfiles import StaticFiles
 from app.database import get_logger, init_db, get_ch, init_logger
-from app.routes import logs, models, app as app_router
+from app.routes import logs
+from app.routes.auth import router as auth_router
+from app.routes.ollama import router as ollama_router
+from app.services import ollama_service
 
 
 async def _module_health_checker() -> None:
@@ -29,6 +30,8 @@ async def lifespan(app: FastAPI):
     ch.ensure_api_logs()  # CREATE TABLE IF NOT EXISTS api_logs
     ch.ensure_app_logs()  # CREATE TABLE IF NOT EXISTS app_logs
     get_logger().app("app.start", "anomascan", message="anomascan backend started")  # first lifecycle event; signals successful startup
+
+    await ollama_service.ensure_model(ollama_service.OLLAMA_MODEL)
 
     health_task = asyncio.create_task(_module_health_checker())
     yield
@@ -48,13 +51,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Creăm folderul public și îl montăm pentru acces frontend
-os.makedirs("/app/public", exist_ok=True)
-app.mount("/public", StaticFiles(directory="/app/public"), name="public")
-
-app.include_router(app_router.router)
-app.include_router(models.router)
+app.include_router(auth_router.router)
 app.include_router(logs.router)
+app.include_router(ollama_router.router)
 
 
 @app.get("/api/health")

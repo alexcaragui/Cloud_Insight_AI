@@ -4,3 +4,4 @@ python-dotenv
 sqlalchemy
 clickhouse-driver
 python-multipart
+httpx

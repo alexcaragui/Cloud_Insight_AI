@@ -2,13 +2,6 @@ import React, { useState, useCallback } from 'react';
 import { FileDropzone } from './FileDropzone';
 import { ToastStack } from './Toast';
 
-// Seed rows shown before any files are uploaded
-const SOURCES = [
-  { id: 1, name: 'sales_q1_2025.csv',      type: 'CSV',  rows: 12_480, size: '1.2 MB', status: 'ready',      updated: '2 hours ago' },
-  { id: 2, name: 'customer_export.xlsx',    type: 'XLSX', rows: 4_305,  size: '840 KB', status: 'ready',      updated: 'Yesterday'   },
-  { id: 3, name: 'product_catalog.json',    type: 'JSON', rows: 892,    size: '310 KB', status: 'processing', updated: 'Just now'    },
-  { id: 4, name: 'warehouse_inventory.csv', type: 'CSV',  rows: 0,      size: '2.1 MB', status: 'error',      updated: '3 days ago'  },
-];
 
 const STATUS_COLORS = {
   ready:      { bg: '#14532d', text: '#4ade80', dot: '#22c55e' },
@@ -40,7 +33,7 @@ function StatusBadge({ status }) {
 const UPLOAD_ENDPOINT = '/api/plugin/cloudInsightAI/upload';
 
 export function Imported_Module() {
-  const [sources, setSources] = useState(SOURCES); // table rows (seed + uploaded files)
+  const [sources, setSources] = useState([]); // table rows (uploaded files)
   const [toasts, setToasts] = useState([]); // notification stack
   const [uploading, setUploading] = useState(false); // true while any file upload is in-flight
 
@@ -134,10 +127,8 @@ export function Imported_Module() {
 
       {/* Summary metrics row */}
       <div style={s.stats}>
-        <StatCard label="Data Sources"   value={sources.length}              sub={`${readyCount} ready`} />
-        <StatCard label="Total Records"  value={totalRows.toLocaleString()}  sub="across all sources" />
-        <StatCard label="Last Ingestion" value="2 hrs ago"                   sub="sales_q1_2025.csv" />
-        <StatCard label="Storage Used"   value="4.4 MB"                      sub="of workspace quota" />
+        <StatCard label="Data Sources"  value={sources.length}             sub={`${readyCount} ready`} />
+        <StatCard label="Total Records" value={totalRows.toLocaleString()} sub="across all sources" />
       </div>
 
       {/* Drag-and-drop / click-to-browse upload zone */}

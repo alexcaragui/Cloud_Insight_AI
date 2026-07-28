@@ -1,10 +1,12 @@
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../context/AuthContext'
+import { useModel } from '../../context/ModelContext'
 
 export default function Sidebar() {
   const { logout } = useAuth()
   const { t } = useTranslation()
+  const { isReady, isPulling } = useModel()
 
   const NAV_ITEMS = [
     {
@@ -41,6 +43,18 @@ export default function Sidebar() {
       ),
     },
     {
+      label: t('nav.models'),
+      to: '/models',
+      end: false,
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+            d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      ),
+      badge: isPulling ? '↓' : undefined,
+    },
+    {
       label: t('nav.reports'),
       to: '/reports',
       end: false,
@@ -52,6 +66,7 @@ export default function Sidebar() {
       ),
     },
   ]
+
 
   return (
     <aside className="w-60 shrink-0 bg-slate-900 flex flex-col h-full">
@@ -74,7 +89,7 @@ export default function Sidebar() {
         <p className="px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-3">
           {t('sidebar.mainMenu')}
         </p>
-        {NAV_ITEMS.map(({ label, to, end, icon }) => (
+        {NAV_ITEMS.map(({ label, to, end, icon, badge }) => (
           <NavLink
             key={to}
             to={to}
@@ -88,7 +103,12 @@ export default function Sidebar() {
             }
           >
             {icon}
-            {label}
+            <span className="flex-1">{label}</span>
+            {badge && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500 text-white animate-pulse">
+                {badge}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>
