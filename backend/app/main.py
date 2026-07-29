@@ -1,24 +1,55 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks, Header, Response, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from typing import Literal
 import asyncio
 
-app = FastAPI(title="CloudInsight-AI Data Ingestion API")
+from app.database import engine, get_db, Base
+from app.models import User, PageResponse
+from app.auth import hash_password, verify_password, create_token, decode_token
 
-# --- 1. CONFIGURARE CORS ---
+
+# --- LIFESPAN: create tables + seed ---
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    Base.metadata.create_all(bind=engine)
+    db = next(get_db())
+    try:
+        if not db.query(User).first():
+            db.add(User(
+                email="admin@cloudinsight.ai",
+                name="User Doe",
+                hashed_password=hash_password("password123"),
+                roles=["user", "admin"],
+                default_theme="dark",
+            ))
+        if not db.query(PageResponse).first():
+            db.add(PageResponse(page_key="dashboard", content="Hello welcome"))
+        db.commit()
+    finally:
+        db.close()
+    yield
+
+
+app = FastAPI(title="CloudInsight-AI Data Ingestion API", lifespan=lifespan)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- 2. GESTIONAR PENTRU WEBSOCKETS ---
-# Aici ținem minte cine este conectat, pentru a ști cui trimitem mesajele
+
+# --- WEBSOCKET MANAGER ---
+
 class ConnectionManager:
     def __init__(self):
-        # Un dicționar care asociază un client_id cu conexiunea lui
         self.active_connections: dict[str, WebSocket] = {}
 
     async def connect(self, websocket: WebSocket, client_id: str):
@@ -33,68 +64,107 @@ class ConnectionManager:
         if client_id in self.active_connections:
             await self.active_connections[client_id].send_text(message)
 
+
 manager = ConnectionManager()
+fake_database: dict[str, str] = {}
 
-# Bază de date falsă pentru a stoca rezultatele procesării
-fake_database = {}
 
-# Schema datelor pe care le așteptăm de la Frontend
+# --- PYDANTIC SCHEMAS ---
+
 class DataInput(BaseModel):
     client_id: str
     data_payload: str
 
-# --- 3. FUNCȚIA DE PROCESARE (Simulare) ---
-# Aceasta va rula în fundal (background) ca să nu blocheze endpoint-ul
+class LoginCredentials(BaseModel):
+    email: str
+    password: str
+
+class ThemePayload(BaseModel):
+    theme: Literal["dark", "light"]
+
+
+# --- AUTH ---
+
+@app.post("/api/auth/login")
+async def login(credentials: LoginCredentials, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == credentials.email).first()
+    if not user or not verify_password(credentials.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    token = create_token(user.email)
+    return {
+        "token": token,
+        "user": {
+            "name": user.name,
+            "roles": user.roles,
+            "defaultTheme": user.default_theme,
+        },
+    }
+
+
+# --- DASHBOARD ---
+
+@app.get("/api/dashboard")
+async def dashboard(authorization: str = Header(default=""), db: Session = Depends(get_db)):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing token")
+    decode_token(authorization.removeprefix("Bearer "))
+    page = db.query(PageResponse).filter(PageResponse.page_key == "dashboard").first()
+    if not page:
+        raise HTTPException(status_code=404, detail="Dashboard content not found")
+    return {"message": page.content}
+
+
+# --- USER THEME ---
+
+@app.patch("/api/user/theme", status_code=204)
+async def set_theme(
+    payload: ThemePayload,
+    authorization: str = Header(default=""),
+    db: Session = Depends(get_db),
+):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing token")
+    email = decode_token(authorization.removeprefix("Bearer "))
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.default_theme = payload.theme
+    db.commit()
+    return Response(status_code=204)
+
+
+# --- DATA INGESTION (unchanged) ---
+
 async def process_data_in_background(client_id: str, data: str):
-    # Simulăm prima parte a procesării
     await asyncio.sleep(2)
     await manager.send_message("Status: Am început procesarea datelor...", client_id)
-    
-    # Simulăm partea a doua a procesării
     await asyncio.sleep(3)
     await manager.send_message("Status: Procesare la 80%...", client_id)
-    
-    # Finalizăm procesarea
     await asyncio.sleep(1)
     fake_database[client_id] = f"SUCCES: Datele '{data}' au fost transformate!"
-    
-    # Trimitem semnalul final către Frontend să își ia datele
     await manager.send_message("CALL_OUTPUT_ENDPOINT", client_id)
 
 
-# --- 4. CELE 3 ENDPOINT-URI CERUTE DE MENTOR ---
-
-# Endpoint 1: INPUT
 @app.post("/api/data-ingestion")
 async def data_ingestion(payload: DataInput, background_tasks: BackgroundTasks):
-    """FE cheamă asta pentru a trimite datele."""
-    # Adăugăm task-ul în fundal. Funcția returnează instant un răspuns către FE.
     background_tasks.add_task(process_data_in_background, payload.client_id, payload.data_payload)
     return {"status": "accepted", "message": "Datele au intrat în procesare."}
 
 
-# Endpoint 2: CHANNEL-LISTENER (WebSocket)
 @app.websocket("/api/data-ingestion-listener/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
-    """FE se conectează aici pentru a asculta actualizări."""
     await manager.connect(websocket, client_id)
     try:
-        # Menținem conexiunea deschisă și ascultăm dacă FE trimite ceva
         while True:
-            data = await websocket.receive_text()
-            # Aici am putea răspunde înapoi dacă FE trimite mesaje pe WebSocket
+            await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(client_id)
 
 
-# Endpoint 3: OUTPUT
 @app.get("/api/data-ingestion-response/{client_id}")
 async def data_ingestion_response(client_id: str):
-    """FE cheamă asta după ce a primit semnalul pe WebSocket."""
     result = fake_database.get(client_id)
     if result:
-        # Curățăm "baza de date" după ce am livrat rezultatul (opțional)
         del fake_database[client_id]
         return {"status": "completed", "final_data": result}
-    
     return {"status": "pending", "message": "Datele nu sunt gata încă."}

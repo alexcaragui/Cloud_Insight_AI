@@ -24,7 +24,12 @@ const ro = {
   login: {
     title: 'CloudInsight AI',
     subtitle: 'Conectează-te la contul tău',
+    email: 'Email',
+    emailPlaceholder: 'tu@exemplu.com',
+    password: 'Parolă',
+    passwordPlaceholder: '••••••••',
     button: 'Conectare',
+    error: 'Email sau parolă incorectă',
   },
   dashboard: {
     loading: 'Se încarcă…',
