@@ -13,7 +13,8 @@ from app.auth import hash_password, verify_password, create_token, decode_token
 
 
 # --- LIFESPAN: create tables + seed ---
-
+# test comment
+# test 2
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
